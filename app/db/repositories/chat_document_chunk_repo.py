@@ -73,16 +73,6 @@ class ChatDocumentChunkRepository:
         """
 
         try:
-            # sql = text("""
-            #     SELECT *,
-            #            1 - (embedding <=> :embedding) AS score
-            #     FROM chat_document_chunks
-            #     WHERE cs_id = :cs_id
-            #       AND 1 - (embedding <=> :embedding) >= :score_threshold
-            #     ORDER BY score DESC
-            #     LIMIT :top_k
-            # """)
-
             sql = text("""
             SELECT
                 cdc_id,

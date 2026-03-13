@@ -1,5 +1,3 @@
-# app/core/cache/redis.py
-
 from typing import Optional
 from redis.asyncio import Redis
 from config import settings

@@ -15,15 +15,15 @@ class RetrievalService:
         top_k: int = 5
     ) -> AppServiceResult[dict]:
         """
-        1️⃣ Embed query
-        2️⃣ Retrieve top-k chunks
-        3️⃣ Build context string
+        1️. Embed query
+        2️. Retrieve top-k chunks
+        3️. Build context string
         """
         try:
             if not question or not question.strip():
                 return AppServiceResult(success=False, error="Question cannot be empty")
-            
-            # 1️⃣ Embed query
+
+            # 1️. Embed query
             llm_service = LLMService("gemini")
             query_embedding = await llm_service.embed_text(text=question)
 
@@ -31,9 +31,10 @@ class RetrievalService:
                 return AppServiceResult(success=False, error=query_embedding.error)
 
             # Do NOT convert to string! Pass as list of floats
-            embedding_str = "[" + ",".join(map(str, query_embedding.embedding)) + "]"
+            embedding_str = "[" + \
+                ",".join(map(str, query_embedding.embedding)) + "]"
 
-            # 2️⃣ Vector search
+            # 2️. Vector search
             chunks = await ChatDocumentChunkRepository.search_similar(
                 cs_id=cs_id,
                 query_embedding=embedding_str,
@@ -44,20 +45,20 @@ class RetrievalService:
             if not chunks:
                 return AppServiceResult(success=False, error="No relevant chunks found")
 
-            # 3️⃣ Build context
+            # 3️. Build context
             context_parts: List[str] = []
 
             chunks = sorted(chunks, key=lambda x: x.page_number or 0)
 
             for chunk in chunks:
                 if chunk.content:
-                    context_parts.append( f"\n{chunk.content.strip()}")
-            
+                    context_parts.append(f"\n{chunk.content.strip()}")
+
             if not context_parts:
                 return AppServiceResult(success=False, error="Chunks were empty")
-            
+
             context = "\n\n---\n\n".join(context_parts)
-            
+
             if len(context) > RetrievalService.MAX_CONTEXT_LENGTH:
                 context = context[:RetrievalService.MAX_CONTEXT_LENGTH]
 

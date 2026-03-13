@@ -1,4 +1,3 @@
-# llm/providers/gemini_provider.py
 from google import genai
 from google.genai.types import GenerateContentConfig, EmbedContentConfig
 from app.core.llm.provider.batch_builder import BatchBuilder
@@ -9,28 +8,20 @@ from app.core.llm.schemas import LLMResponse, EmbeddingResponse
 from app.core.llm.registry import LLMRegistry
 from typing import List
 import asyncio
-import time
-
-EMBEDDING_FILE = "cached_embeddings.json"
 
 class GeminiProvider(BaseLLM):
 
     def __init__(self):
-        self.client = genai.Client(
-            api_key=settings.GEMINI_API_KEY,
-        )
+        self.client = genai.Client( api_key=settings.GEMINI_API_KEY)
+        self.model = settings.GEMINI_MODEL
         self.embedding_model = settings.GEMINI_EMBEDDING_MODEL
         self.batch_builder = BatchBuilder()
         self.rate_limiter = RateLimiter()
 
     async def generate(self, system_prompt, user_prompt, temperature=0.2) -> LLMResponse:
-        print("Generating with GeminiProvider.......")
         try:
-        
-            # prompt = f"{system_prompt}\n\n{user_prompt}"
-
             result = await self.client.aio.models.generate_content(
-                model=settings.GEMINI_MODEL,
+                model=self.model,
                 contents=user_prompt,
                 config=GenerateContentConfig(
                         system_instruction=system_prompt,
@@ -38,7 +29,6 @@ class GeminiProvider(BaseLLM):
                     )
             )
 
-            print("Text:", result.text)
             tokens_used = 0
             if result.usage_metadata:
                 tokens_used = result.usage_metadata.total_token_count
@@ -53,15 +43,12 @@ class GeminiProvider(BaseLLM):
             error_str = str(e)
             print("gemini exception:", error_str)
 
-            # Handle quota exceeded
             if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
                 return LLMResponse(
                     success=False,
                     error="Gemini API quota exceeded. Please try again later.",
-                    
                 )
 
-            # Handle rate limit
             if "rate limit" in error_str.lower():
                 return LLMResponse(
                     success=False,
@@ -77,7 +64,7 @@ class GeminiProvider(BaseLLM):
     async def embed_text(self, text:str) -> EmbeddingResponse:
         try:
             result = await self.client.aio.models.embed_content(
-                model=settings.GEMINI_EMBEDDING_MODEL,
+                model=self.embedding_model,
                 contents=text,
                 config = EmbedContentConfig(
                     task_type="QUESTION_ANSWERING",
@@ -99,12 +86,10 @@ class GeminiProvider(BaseLLM):
         
     async def embed_batch(self, texts:List[str]) -> EmbeddingResponse:
             
-        print("Embedding batch with GeminiProvider......")
         batches = self.batch_builder.build(texts)
         print("batches lenght", len(batches))
 
         all_embeddings: List[List[float]] = []
-        print("batche builds successfully.......")
 
         retry_attempts = 5
         delay = 1 
@@ -145,16 +130,12 @@ class GeminiProvider(BaseLLM):
                         retry_attempts -= 1
                         if retry_attempts > 0:
                             await asyncio.sleep(delay)
-                            delay *= 2  # Exponential backoff
-                            continue  # Retry with the new API key
+                            delay *= 2
+                            continue
                         else:
                             raise
-
-
                     else:
                         raise                                                        
-
-            print("embedding length", len(all_embeddings))
 
             return EmbeddingResponse(
                 success=True,

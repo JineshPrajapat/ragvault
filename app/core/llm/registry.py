@@ -1,5 +1,3 @@
-# llm/registry.py
-
 class LLMRegistry:
     _providers: dict[str, type] = {}
 

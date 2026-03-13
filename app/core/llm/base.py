@@ -1,4 +1,3 @@
-# llm/base.py
 from abc import ABC, abstractmethod
 from typing import List
 from app.core.llm.schemas import LLMResponse, EmbeddingResponse

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import insert, text
 from app.db.models.chat_document_chunk import ChatDocumentChunk
 from app.core.session_manager import use_db_async
+from pgvector.sqlalchemy import Vector
 
 
 class ChatDocumentChunkRepository:
@@ -25,22 +26,27 @@ class ChatDocumentChunkRepository:
         if len(chunks) != len(embeddings):
             raise ValueError("Chunks and embeddings length mismatch")
 
-
         try:
             records = []
 
-            for chunk, vector in zip(chunks, embeddings):
+            for chunk, emb in zip(chunks, embeddings):
+                
+
+                # Optional: sanity check for dimension
+                if len(emb) != 1536:
+                    raise ValueError(
+                        f"Embedding dimension mismatch for chunk {chunk['chunk_index']}: {len(emb)}"
+                    )
+            
                 records.append({
                     "cd_id": cd_id,
                     "cs_id": cs_id,
                     "chunk_index": chunk["chunk_index"],
-                    "content": chunk["text"],
-                    "page_number": chunk.get("page_number"),
-                    "chapter_title": chunk.get("chapter_title"),
-                    "section_title": chunk.get("section_title"),
-                    "keywords": chunk.get("keywords"),
-                    "meta": chunk.get("meta"),
-                    "embedding": vector,
+                    "content": chunk["content"],
+                    "page_number": chunk["metadata"].get("page"),
+                    "keywords": chunk["metadata"].get("keywords"),
+                    "meta": chunk["metadata"].get("meta"),
+                    "embedding": emb,
                 })
 
             stmt = insert(ChatDocumentChunk).values(records)
@@ -57,8 +63,8 @@ class ChatDocumentChunkRepository:
     async def search_similar(
         cs_id: UUID,
         query_embedding: List[float],
-        query_text:str,
-        top_k: int = 20,
+        query_text: str,
+        top_k: int = 5,
         score_threshold: float = 0.7,
         db: AsyncSession = None
     ) -> List[ChatDocumentChunk]:
@@ -66,43 +72,50 @@ class ChatDocumentChunkRepository:
         Perform cosine similarity search using pgvector.
         """
 
-
         try:
+            # sql = text("""
+            #     SELECT *,
+            #            1 - (embedding <=> :embedding) AS score
+            #     FROM chat_document_chunks
+            #     WHERE cs_id = :cs_id
+            #       AND 1 - (embedding <=> :embedding) >= :score_threshold
+            #     ORDER BY score DESC
+            #     LIMIT :top_k
+            # """)
+
             sql = text("""
-                SELECT *,
-                       1 - (embedding <=> :embedding) AS score
-                FROM chat_document_chunks
-                WHERE cs_id = :cs_id
-                  AND 1 - (embedding <=> :embedding) >= :score_threshold
-                ORDER BY score DESC
-                LIMIT :top_k
+            SELECT
+                cdc_id,
+                cd_id,
+                cs_id,
+                chunk_index,
+                content,
+                embedding,
+                page_number,
+                keywords,
+                meta,
+                created_at,
+
+                (
+                    0.65 * (1 - (embedding <=> :embedding)) +
+                    0.25 * ts_rank(content_tsv, plainto_tsquery('english', :query)) +
+                    0.10 * CASE
+                        WHEN keywords && string_to_array(:query, ' ')
+                        THEN 1
+                        ELSE 0
+                    END
+                ) AS score
+
+            FROM chat_document_chunks
+
+            WHERE cs_id = :cs_id
+
+            ORDER BY score DESC
+
+            LIMIT :top_k
             """)
 
-#             sql = text("""
-#     SELECT
-#         cdc_id,
-#         cd_id,
-#         cs_id,
-#         chunk_index,
-#         content,
-#         embedding,
-#         page_number,
-#         chapter_title,
-#         section_title,
-#         keywords,
-#         meta,
-#         created_at,
-#         (
-#             0.7 * (1 - (embedding <=> :embedding))
-#             +
-#             0.3 * ts_rank(content_tsv, plainto_tsquery(:query))
-#         ) AS score
-#     FROM chat_document_chunks
-#     WHERE cs_id = :cs_id
-#     ORDER BY score DESC
-#     LIMIT :top_k
-# """)
-            
+
             result = await db.execute(
                 sql,
                 {

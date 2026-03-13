@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     OPENAI_EMBEDDING_MODEL : str
 
     GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-1.5-flash"
-    GEMINI_EMBEDDING_MODEL: str= "models/embedding-001"
+    GEMINI_MODEL: str
+    GEMINI_EMBEDDING_MODEL: str
 
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str

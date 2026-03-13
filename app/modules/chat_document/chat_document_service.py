@@ -55,3 +55,8 @@ class ChatDocumentService:
     @staticmethod
     async def list_documents_by_session(u_id: UUID, cs_id: UUID):
         return await ChatDocumentRepository.list_by_session(cs_id=cs_id)
+    
+    @staticmethod
+    async def delete_document(cs_id: UUID, cd_id: UUID):
+        return await ChatDocumentRepository.hard_delete(cs_id=cs_id, cd_id=cd_id)
+    

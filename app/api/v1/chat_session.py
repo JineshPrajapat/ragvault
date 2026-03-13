@@ -5,15 +5,10 @@ from app.modules.chat.chat_message_service import ChatMessageService
 from app.modules.chat_document.chat_document_service import ChatDocumentService
 from app.modules.chat.chat_service import ChatService
 from app.schemas.chat_session import ChatSessionCreate
+from app.schemas.chat import AskRequest, RenameSessionRequest
 from app.utils.response_builder import ResponseBuilder
 from app.schemas.api_response import APIResponse
-from pydantic import BaseModel
 
-class AskRequest(BaseModel):
-    question: str
-    
-class RenameSessionRequest(BaseModel):
-    title: str
 
 router = APIRouter(tags=["Chat Sessions"])
 
@@ -85,20 +80,32 @@ async def list_documents(cs_id: UUID, req: Request):
 
     return ResponseBuilder.success(documents, "Document list retriewd successfully")
 
+@router.delete("/{cs_id}/documents/{cd_id}", response_model=APIResponse)
+async def remove_document(cs_id: UUID, cd_id:UUID, req: Request):
+
+    try:
+        deleted = await ChatDocumentService.delete_document(cs_id, cd_id)
+
+        if not deleted:
+            ResponseBuilder.error("Document not found", code=404)
+
+        return ResponseBuilder.success({"deleted": deleted}, "Document deleted successfully")
+
+    except Exception as e:
+        return ResponseBuilder.error(message=str(e), code=400)
 
 @router.post("/{cs_id}/ask", response_model=APIResponse)
 async def ask_question(cs_id: UUID, payload: AskRequest):
-
+    
     result = await ChatService.ask_question(
         cs_id=cs_id,
         question=payload.question,
     )
 
-    if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
+    if not result.success:
+        return ResponseBuilder.error(result.error, code=400)
 
-    return ResponseBuilder.success(result, "rag result successfully")
-
+    return ResponseBuilder.success(result.data, "RAG result generated successfully")
 
 @router.get("/{cs_id}/messages", response_model=APIResponse)
 async def get_messages(

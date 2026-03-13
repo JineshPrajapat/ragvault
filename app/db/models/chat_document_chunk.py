@@ -3,7 +3,7 @@ from sqlalchemy import Column, Text, Integer, ForeignKey, DateTime, String, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.dialects.postgresql.base import TSVECTOR
 from sqlalchemy.sql import func
-from pgvector.sqlalchemy import Vector
+from pgvector.sqlalchemy import VECTOR
 from app.core.database import Base
 
 
@@ -31,19 +31,10 @@ class ChatDocumentChunk(Base):
     )
 
     chunk_index = Column(Integer, nullable=False)
-
     content = Column(Text, nullable=False)
-
-    embedding = Column(Vector(1024), nullable=False)
-
+    embedding = Column(VECTOR(1536), nullable=False)
     content_tsv = Column(TSVECTOR)
-
-    page_number = Column(Integer)
-
-    section_title = Column(String)
-    chapter_title = Column(String)
-
     keywords = Column(ARRAY(String))
+    page_number = Column(Integer)
     meta = Column(JSON)
-
     created_at = Column(DateTime(timezone=True), server_default=func.now())

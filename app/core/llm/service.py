@@ -2,6 +2,7 @@
 from app.core.llm.manager import LLMManager
 from app.core.llm.base import BaseLLM
 from app.core.llm.schemas import LLMResponse, EmbeddingResponse
+from typing import List
 
 
 class LLMService:
@@ -25,10 +26,18 @@ class LLMService:
         llm = self._get_provider(provider)
         return await llm.generate(system_prompt, user_prompt, temperature)
 
-    async def embed(
+    async def embed_text(
         self,
         text: str,
         provider: str | None = None
     ) -> EmbeddingResponse:
         llm = self._get_provider(provider)
         return await llm.embed_text(text)
+
+    async def embed_batch(
+        self,
+        texts: List[str],
+        provider: str | None = None
+    ) -> EmbeddingResponse:
+        llm = self._get_provider(provider)
+        return await llm.embed_batch(texts)

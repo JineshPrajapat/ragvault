@@ -1,4 +1,3 @@
-# llm/providers/openai_provider.py
 from openai import OpenAI
 from config import settings
 from app.core.llm.base import BaseLLM
@@ -34,7 +33,7 @@ class OpenAIProvider(BaseLLM):
                 error=str(e)
             )
 
-    def embed(self, text):
+    def embed_text(self, text):
         try:
             response = self.client.embeddings.create(
                 model=settings.OPENAI_EMBEDDING_MODEL,

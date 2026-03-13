@@ -12,3 +12,7 @@ class BaseLLM(ABC):
     @abstractmethod
     def embed_text(self, text: str) -> EmbeddingResponse:
         pass
+
+    @abstractmethod
+    def embed_batch(self, texts: List[str]) -> EmbeddingResponse:
+        pass

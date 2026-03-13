@@ -1,31 +1,37 @@
 from uuid import UUID
 from typing import List
-from app.modules.embedding.embedder import Embedder
 from app.db.repositories.chat_document_chunk_repo import ChatDocumentChunkRepository
-import traceback
+from app.core.llm.service import LLMService
+from app.schemas.api_response import AppServiceResult
 
 
 class RetrievalService:
+    MAX_CONTEXT_LENGTH = 8000
 
     @staticmethod
     async def retrieve_context(
         cs_id: UUID,
         question: str,
-        top_k: int = 10
-    ) -> str:
+        top_k: int = 5
+    ) -> AppServiceResult[dict]:
         """
         1️⃣ Embed query
         2️⃣ Retrieve top-k chunks
         3️⃣ Build context string
         """
         try:
+            if not question or not question.strip():
+                return AppServiceResult(success=False, error="Question cannot be empty")
+            
             # 1️⃣ Embed query
-            query_embedding = Embedder().embed_text(text=question)
-            print("query_embedding length:", len(query_embedding))
-            print("query_embedding sample:", query_embedding[:5])  # first 5 floats
+            llm_service = LLMService("gemini")
+            query_embedding = await llm_service.embed_text(text=question)
+
+            if not query_embedding.success:
+                return AppServiceResult(success=False, error=query_embedding.error)
 
             # Do NOT convert to string! Pass as list of floats
-            embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
+            embedding_str = "[" + ",".join(map(str, query_embedding.embedding)) + "]"
 
             # 2️⃣ Vector search
             chunks = await ChatDocumentChunkRepository.search_similar(
@@ -36,8 +42,7 @@ class RetrievalService:
             )
 
             if not chunks:
-                print("No chunks returned from search_similar")
-                return ""
+                return AppServiceResult(success=False, error="No relevant chunks found")
 
             # 3️⃣ Build context
             context_parts: List[str] = []
@@ -45,13 +50,19 @@ class RetrievalService:
             chunks = sorted(chunks, key=lambda x: x.page_number or 0)
 
             for chunk in chunks:
-                context_parts.append(
-                    f"[Page {chunk.page_number}]\n{chunk.content}"
-                )
+                if chunk.content:
+                    context_parts.append( f"\n{chunk.content.strip()}")
+            
+            if not context_parts:
+                return AppServiceResult(success=False, error="Chunks were empty")
+            
+            context = "\n\n---\n\n".join(context_parts)
+            
+            if len(context) > RetrievalService.MAX_CONTEXT_LENGTH:
+                context = context[:RetrievalService.MAX_CONTEXT_LENGTH]
 
-            return "\n\n---\n\n".join(context_parts)
+            return AppServiceResult(success=True, data=context)
 
         except Exception as e:
             print("Error in retrieve_context:", str(e))
-            traceback.print_exc()
-            return ""
+            return AppServiceResult(success=False, error="Context retrieval failed")

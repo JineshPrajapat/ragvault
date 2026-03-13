@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from app.db.models.chat_document import ChatDocument
 from app.core.session_manager import use_db_async
 from uuid import UUID
@@ -44,3 +44,14 @@ class ChatDocumentRepository:
             .where(ChatDocument.cs_id == cs_id)
         )
         return result.scalars().all()
+    
+    @staticmethod
+    @use_db_async
+    async def hard_delete(cs_id:UUID, cd_id: UUID, db: AsyncSession):
+        result = await db.execute(
+            delete(ChatDocument)
+            .where(ChatDocument.cs_id == cs_id, ChatDocument.cd_id == cd_id)
+        )
+        await db.commit()
+
+        return result.rowcount

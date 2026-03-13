@@ -9,6 +9,7 @@ class LLMResponse:
     content: Optional[str] = None
     tokens_used: Optional[int] = None
     error: Optional[str] = None
+    error_code: Optional[str] = None
 
 
 @dataclass

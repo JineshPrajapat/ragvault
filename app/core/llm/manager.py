@@ -1,6 +1,7 @@
 # llm/manager.py
 from app.core.llm.registry import LLMRegistry
 from app.core.llm.base import BaseLLM
+from app.core.llm.provider import *
 
 class LLMManager:
 

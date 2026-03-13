@@ -1,16 +1,14 @@
 from app.db.repositories.chat_document_repo import ChatDocumentRepository
 from app.db.repositories.chat_document_chunk_repo import ChatDocumentChunkRepository
-from app.modules.embedding.pdf.processor import PDFProcessor
-from app.modules.ingestion.pipeline.ingestion_pipeline import IngestionPipeline
-from app.modules.embedding.text_chunker import TextChunker
-from app.modules.embedding.embedder import Embedder
+from app.modules.rag_ingestion.pipeline.ingestion_pipeline import IngestionPipeline
+from app.core.llm.service import LLMService
 from uuid import UUID
-
 
 class EmbeddingService:
 
     @staticmethod
     async def process_document(cd_id: UUID):
+        print(f"EmbeddingService.process_document: {cd_id}")
         try:
             document = await ChatDocumentRepository.get_by_id_sync(cd_id)
             if not document:
@@ -22,21 +20,31 @@ class EmbeddingService:
 
             # 2️. Extract PDF text
             print("Extracting PDF text.......")
-            chunks = PDFProcessor().process(document.file_path)
-            # chunks = IngestionPipeline().run(document.file_path)
-            print("chunks length", len(chunks))
+            parsed = IngestionPipeline().run(document.file_path)
+            chunks = parsed["text"]
 
             # 3. Generate embeddings
             print("Generate embeddings................")
-            vectors = Embedder().embed_batch([c["text"] for c in chunks])
-            print("vectors length", len(vectors))
+            llm_service = LLMService("gemini")
+            embedding_result = await llm_service.embed_batch([c["content"] for c in chunks])
+            # print("\n\nembedding_result\n\n", embedding_result)
 
+            if not embedding_result.success:
+                return {"error": embedding_result.error}                    #update status
+            
+            for i, emb in enumerate(embedding_result.embedding):
+                if len(emb) != 1536:
+                    raise ValueError(
+                        f"Embedding length mismatch in batch {i}, index {i}: got {len(emb)}"    #update status
+                    )
+            
             # 4. Insert into chat_document_chunks
+            print("\n\nbulk_insert\n\n")
             await ChatDocumentChunkRepository.bulk_insert(
                 cd_id=cd_id,
                 cs_id=document.cs_id,
                 chunks=chunks,
-                embeddings=vectors
+                embeddings=embedding_result.embedding
             )
 
             # 5. Update status
